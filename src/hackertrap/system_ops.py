@@ -121,13 +121,26 @@ def get_installed_commit(repo_path: Path | None = None) -> str:
     return "not installed" if not (path / ".git").is_dir() else "unknown"
 
 
-def get_last_update_log(lines: int = 5) -> str:
+def get_last_update_log(max_lines: int = 15) -> str:
+    """Return the most recent web-triggered update session from the log file."""
     if not UPDATE_LOG.is_file():
         return ""
     try:
         text = UPDATE_LOG.read_text(encoding="utf-8", errors="replace")
-        tail = [ln for ln in text.strip().splitlines() if ln.strip()][-lines:]
-        return "\n".join(tail)
+        lines = [ln for ln in text.splitlines() if ln.strip()]
+        if not lines:
+            return ""
+
+        marker = "--- web-triggered update ---"
+        start = 0
+        for i, line in enumerate(lines):
+            if line.strip() == marker:
+                start = i
+
+        session = lines[start:]
+        if len(session) > max_lines:
+            session = session[-max_lines:]
+        return "\n".join(session)
     except OSError:
         return ""
 
