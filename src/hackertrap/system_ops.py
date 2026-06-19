@@ -10,6 +10,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 UPDATE_LOG = Path("/var/lib/hackertrap/update.log")
+INSTALLED_COMMIT_FILE = Path("/var/lib/hackertrap/installed-commit")
 DEFAULT_REPO_URL = "https://github.com/marckranat/hackertrap"
 DEFAULT_REPO_PATH = Path("/var/lib/hackertrap/repo")
 TZ_PATTERN = re.compile(r"^[A-Za-z0-9_+-]+(?:/[A-Za-z0-9_+-]+)+$")
@@ -90,23 +91,34 @@ def repo_dir(configured_path: str = "", configured_url: str = "") -> Path:
     return path
 
 
+def _read_commit_file() -> str:
+    try:
+        text = INSTALLED_COMMIT_FILE.read_text(encoding="utf-8").strip()
+        return text
+    except OSError:
+        return ""
+
+
 def get_installed_commit(repo_path: Path | None = None) -> str:
     path = repo_path or DEFAULT_REPO_PATH
-    if not (path / ".git").is_dir():
-        return "not installed"
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(path), "log", "-1", "--format=%h %s"],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=5,
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip()
-    except (subprocess.SubprocessError, FileNotFoundError):
-        pass
-    return "unknown"
+    if (path / ".git").is_dir():
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(path), "log", "-1", "--format=%h %s"],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=5,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+        except (subprocess.SubprocessError, FileNotFoundError):
+            pass
+
+    recorded = _read_commit_file()
+    if recorded:
+        return recorded
+    return "not installed" if not (path / ".git").is_dir() else "unknown"
 
 
 def get_last_update_log(lines: int = 5) -> str:

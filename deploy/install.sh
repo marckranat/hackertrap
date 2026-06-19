@@ -87,6 +87,12 @@ echo "==> Configuring iptables logging"
 "$REPO_DIR/deploy/iptables/setup.sh"
 chmod +x "$REPO_DIR/deploy/update-web.sh" "$REPO_DIR/deploy/sync-repo.sh"
 
+echo "==> Cloning update source to $DATA_DIR/repo"
+bash "$INSTALL_DIR/deploy/sync-repo.sh" "https://github.com/marckranat/hackertrap" "$DATA_DIR/repo" >/dev/null
+if COMMIT=$(git -C "$DATA_DIR/repo" log -1 --format="%h %s" 2>/dev/null); then
+  echo "$COMMIT" > "$DATA_DIR/installed-commit"
+fi
+
 echo "==> Configuring mDNS hostname (hackertrap.local)"
 if ! grep -q "hackertrap" /etc/avahi/services/hackertrap.service 2>/dev/null; then
   cp "$REPO_DIR/deploy/avahi/hackertrap.service" /etc/avahi/services/

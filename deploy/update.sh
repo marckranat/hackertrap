@@ -8,10 +8,12 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 INSTALL_DIR="/opt/hackertrap"
+DATA_DIR="/var/lib/hackertrap"
 VENV="$INSTALL_DIR/.venv"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_URL="${HACKERTRAP_REPO_URL:-https://github.com/marckranat/hackertrap}"
-STANDARD_REPO="/var/lib/hackertrap/repo"
+STANDARD_REPO="$DATA_DIR/repo"
+INSTALLED_COMMIT_FILE="$DATA_DIR/installed-commit"
 
 # Use the checkout this script was invoked from, or the standard GitHub clone.
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -22,9 +24,18 @@ else
   git -C "$REPO_DIR" pull --ff-only
 fi
 
+if [[ "$REPO_DIR" != "$STANDARD_REPO" ]]; then
+  echo "==> Refreshing standard repo at $STANDARD_REPO (for web updates)"
+  REPO_DIR="$(bash "$SCRIPT_DIR/sync-repo.sh" "$REPO_URL" "$STANDARD_REPO")"
+fi
+
 echo "==> Syncing to $INSTALL_DIR"
 rsync -a --exclude '.venv' --exclude '__pycache__' --exclude 'data' --exclude '.git' \
   "$REPO_DIR/" "$INSTALL_DIR/"
+
+if COMMIT=$(git -C "$REPO_DIR" log -1 --format="%h %s" 2>/dev/null); then
+  echo "$COMMIT" > "$INSTALLED_COMMIT_FILE"
+fi
 
 echo "==> Reinstalling Python package (includes web templates)"
 "$VENV/bin/pip" install -e "$INSTALL_DIR"
