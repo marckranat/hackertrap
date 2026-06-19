@@ -1,0 +1,22 @@
+[Unit]
+Description=HackerTrap network honeypot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Environment=HACKERTRAP_DATA_DIR=/var/lib/hackertrap
+WorkingDirectory=/opt/hackertrap
+# Re-apply iptables logging on every start (rules do not survive reboot by default).
+ExecStartPre=-/bin/bash /opt/hackertrap/deploy/iptables/setup.sh
+ExecStart=/opt/hackertrap/.venv/bin/hackertrap
+Restart=on-failure
+RestartSec=5
+
+# Honeypot services bind privileged ports (21, 22, 23)
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_NET_RAW
+
+[Install]
+WantedBy=multi-user.target

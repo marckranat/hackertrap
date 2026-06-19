@@ -1,0 +1,34 @@
+# Copy to config.local.yaml for local development.
+# Ports above 1024 avoid needing root on macOS/Linux dev machines.
+
+device_id: dev-local
+setup_complete: false
+data_dir: ./data
+
+honeypot:
+  hostname: dev-honeytrap
+  listen_host: 127.0.0.1
+  ports:
+    ftp: 2121
+    telnet: 2323
+    ssh: 2222
+    vnc: 5901
+
+notifications:
+  ntfy:
+    enabled: false
+    server: https://ntfy.sh
+    topic: ""
+    token: ""
+  webhooks: []
+
+web:
+  host: 127.0.0.1
+  port: 8080
+  setup_token: dev-setup-token-change-me
+
+detector:
+  log_source: auto
+  log_path: /var/log/kern.log
+  scan_threshold: 10
+  scan_window_seconds: 60

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — HackerTrap{% endblock %}
+
+{% block header_extra %}
+<a href="/settings" class="btn small">Settings</a>
+<form method="post" action="/logout" class="inline-form">
+  <button type="submit" class="btn small">Sign out</button>
+</form>
+<form method="post" action="/test-alert" class="inline-form">
+  <button type="submit" class="btn small">Send test alert</button>
+</form>
+{% endblock %}
+
+{% block content %}
+{% if request.query_params.get('test') == 'ok' %}
+<div class="banner success">Test alert sent successfully.</div>
+{% endif %}
+
+<section class="grid stats">
+  <div class="card stat">
+    <span class="label">Status</span>
+    <strong class="value ok">Monitoring</strong>
+  </div>
+  <div class="card stat">
+    <span class="label">Uptime</span>
+    <strong class="value">{{ uptime }}</strong>
+  </div>
+  <div class="card stat">
+    <span class="label">Alerts</span>
+    <strong class="value">{{ total_alerts }}</strong>
+  </div>
+  <div class="card stat">
+    <span class="label">Local IP</span>
+    <strong class="value mono">{{ local_ip }}</strong>
+  </div>
+</section>
+
+<section class="grid two-col">
+  <div class="card">
+    <h2>Services listening</h2>
+    <ul class="service-list">
+      {% for name, port in ports.items() %}
+      <li><span class="badge">{{ name|upper }}</span> port {{ port }}</li>
+      {% endfor %}
+    </ul>
+    <h3>Notifications</h3>
+    {% if channels %}
+    <ul>
+      {% for ch in channels %}
+      <li>{{ ch }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="warn">No channels configured — alerts are logged locally only.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Scan detection</h2>
+    {% if iptables_ok %}
+    <p class="ok-text">iptables logging active</p>
+    {% else %}
+    <p class="warn">iptables logging not detected.</p>
+    <form method="post" action="/settings/iptables" class="inline-form">
+      <button type="submit" class="btn small">Enable scan detection</button>
+    </form>
+    {% endif %}
+    <p class="hint">Port scans are detected when one IP hits many ports within 60 seconds.</p>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Recent alerts</h2>
+  {% if alerts %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Time (UTC)</th>
+          <th>Event</th>
+          <th>Source IP</th>
+          <th>Detail</th>
+          <th>Sent</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for alert in alerts %}
+        <tr>
+          <td class="mono">{{ alert.created_at[:19] }}</td>
+          <td><span class="badge alert">{{ alert.event_type }}</span></td>
+          <td class="mono">{{ alert.source_ip }}</td>
+          <td>{{ alert.detail }}</td>
+          <td>{% if alert.notified %}✓{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No alerts yet — that's good. Try port-scanning this device from another machine to test.</p>
+  {% endif %}
+</section>
+{% endblock %}

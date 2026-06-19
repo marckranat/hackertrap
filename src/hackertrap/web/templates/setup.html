@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Setup — HackerTrap{% endblock %}
+
+{% block content %}
+<section class="card hero">
+  <h1>Welcome to HackerTrap</h1>
+  <p>Plug this device into your network, finish setup here, and you'll get alerted when someone probes it like an attacker would.</p>
+  <p class="muted">Device ID: <code>{{ device_id }}</code></p>
+</section>
+
+<form method="post" action="/setup" class="card form">
+  <input type="hidden" name="token" value="{{ setup_token }}">
+
+  <h2>1. Device identity</h2>
+  <label>
+    Hostname (what this Pi looks like on the network)
+    <input type="text" name="hostname" value="{{ hostname }}" maxlength="64" required
+           placeholder="accountserver">
+  </label>
+  <p class="hint">Pick a boring name that fits your network — e.g. <code>accountserver</code>, <code>filemanager</code>, <code>dc02</code>, <code>NAS01</code>. Avoid anything with "honeypot" or "trap" in it.</p>
+
+  <h2>2. Notifications</h2>
+  <p class="hint">
+    <strong>Recommended:</strong> ntfy push to your phone —
+    <a href="https://docs.ntfy.sh/subscribe/phone/" target="_blank" rel="noopener">how to subscribe</a>.
+    Enter your topic name or paste the full URL from ntfy.sh.
+  </p>
+
+  <fieldset>
+    <legend>ntfy push notifications</legend>
+    <label>
+      ntfy server
+      <input type="url" name="ntfy_server" value="https://ntfy.sh" placeholder="https://ntfy.sh">
+    </label>
+    <label>
+      Topic
+      <input type="text" name="ntfy_topic" placeholder="JkdQO4P or https://ntfy.sh/your-topic">
+    </label>
+    <label>
+      Access token (optional, for private topics)
+      <input type="password" name="ntfy_token" autocomplete="off">
+    </label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Discord / Slack webhook (optional)</legend>
+    <label>
+      Webhook URL
+      <input type="url" name="webhook_url" placeholder="https://discord.com/api/webhooks/...">
+    </label>
+    <label>
+      Label
+      <input type="text" name="webhook_name" value="discord">
+    </label>
+  </fieldset>
+
+  <h2>3. Admin password</h2>
+  <p class="hint">Protects the web dashboard from others on your network. Minimum 8 characters.</p>
+  <label>
+    Admin password
+    <input type="password" name="admin_password" minlength="8" required autocomplete="new-password">
+  </label>
+
+  <button type="submit" class="btn primary">Save &amp; start monitoring</button>
+</form>
+{% endblock %}
