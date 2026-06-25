@@ -16,9 +16,10 @@ DEFAULT_CONFIG_PATHS = (
 
 DEFAULT_DATA_DIR = Path(os.environ.get("HACKERTRAP_DATA_DIR", "/var/lib/hackertrap"))
 
-# Bland enough to blend in on a typical LAN — not "honeypot" or "backup-server".
-DEFAULT_HOSTNAME = "accountserver"
+from hackertrap.personas import DEFAULT_PORTS
 
+DEFAULT_HOSTNAME = "accountserver"
+DEFAULT_PERSONA = "accountserver"
 DEFAULT_REPO_URL = "https://github.com/marckranat/hackertrap"
 DEFAULT_REPO_PATH = "/var/lib/hackertrap/repo"
 
@@ -45,10 +46,11 @@ def normalize_ntfy_topic(raw: str) -> str:
 
 
 def sanitize_honeypot_ports(ports: dict[str, int]) -> dict[str, int]:
-    """Drop ssh:22 — real sshd owns that port; SSH probes use iptables detection."""
-    cleaned = dict(ports)
-    cleaned.pop("ssh", None)
-    return cleaned
+    """Merge with defaults and drop ssh:22 — real sshd owns that port."""
+    merged = dict(DEFAULT_PORTS)
+    merged.update(ports)
+    merged.pop("ssh", None)
+    return merged
 
 
 @dataclass
@@ -70,15 +72,15 @@ class WebhookConfig:
 class NotificationsConfig:
     ntfy: NtfyConfig = field(default_factory=NtfyConfig)
     webhooks: list[WebhookConfig] = field(default_factory=list)
+    notify_on_reboot: bool = True
 
 
 @dataclass
 class HoneypotConfig:
+    persona: str = DEFAULT_PERSONA
     hostname: str = DEFAULT_HOSTNAME
     listen_host: str = "0.0.0.0"
-    ports: dict[str, int] = field(
-        default_factory=lambda: {"ftp": 21, "telnet": 23, "vnc": 5900}
-    )
+    ports: dict[str, int] = field(default_factory=lambda: dict(DEFAULT_PORTS))
 
 
 @dataclass
@@ -142,6 +144,7 @@ def _parse_notifications(raw: dict[str, Any]) -> NotificationsConfig:
             )
             for w in webhooks_raw
         ],
+        notify_on_reboot=bool(raw.get("notify_on_reboot", True)),
     )
 
 
@@ -182,9 +185,12 @@ def load_config(path: Path | None = None) -> Config:
         device_id=str(raw.get("device_id", secrets.token_hex(4))),
         setup_complete=bool(raw.get("setup_complete", False)),
         honeypot=HoneypotConfig(
+            persona=str(honeypot_raw.get("persona", DEFAULT_PERSONA)),
             hostname=str(honeypot_raw.get("hostname", DEFAULT_HOSTNAME)),
             listen_host=str(honeypot_raw.get("listen_host", "0.0.0.0")),
-            ports=sanitize_honeypot_ports(dict(honeypot_raw.get("ports", HoneypotConfig().ports))),
+            ports=sanitize_honeypot_ports(
+                dict(honeypot_raw.get("ports") or DEFAULT_PORTS)
+            ),
         ),
         notifications=_parse_notifications(_as_dict(raw.get("notifications"))),
         web=WebConfig(
@@ -219,11 +225,13 @@ def save_config(cfg: Config, path: Path | None = None) -> Path:
         "setup_complete": cfg.setup_complete,
         "data_dir": str(cfg.data_dir),
         "honeypot": {
+            "persona": cfg.honeypot.persona,
             "hostname": cfg.honeypot.hostname,
             "listen_host": cfg.honeypot.listen_host,
             "ports": cfg.honeypot.ports,
         },
         "notifications": {
+            "notify_on_reboot": cfg.notifications.notify_on_reboot,
             "ntfy": {
                 "enabled": cfg.notifications.ntfy.enabled,
                 "server": cfg.notifications.ntfy.server,

@@ -41,6 +41,29 @@ class EventHandler:
         notified = await dispatch_alert(self.cfg, title, message)
         await record_alert(self.db_path, "port_scan", source_ip, detail, notified=notified)
 
+    async def handle_reboot(self, detail: str) -> None:
+        title = f"HackerTrap: {self.cfg.honeypot.hostname} came online after reboot"
+        message = (
+            f"Device: {self.cfg.honeypot.hostname}\n"
+            f"Event: {detail}\n"
+            f"ID: {self.cfg.device_id}\n"
+            "If you did not restart the device, check power or tampering."
+        )
+        notified = await dispatch_alert(self.cfg, title, message)
+        await record_alert(self.db_path, "reboot", "127.0.0.1", detail, notified=notified)
+
+    async def maybe_notify_reboot(self) -> None:
+        from hackertrap.system_ops import consume_reboot_notification
+
+        if not self.cfg.setup_complete:
+            return
+        if not self.cfg.notifications.notify_on_reboot:
+            return
+
+        detail = consume_reboot_notification()
+        if detail:
+            await self.handle_reboot(detail)
+
     async def send_test_alert(self) -> bool:
         title = "HackerTrap test alert"
         message = (

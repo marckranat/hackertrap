@@ -14,6 +14,7 @@ from hackertrap.db import init_db
 from hackertrap.detector import LogDetector, ensure_iptables_logging
 from hackertrap.events import EventHandler
 from hackertrap.honeypot import HoneypotServer
+from hackertrap.system_ops import refresh_mdns
 from hackertrap.web.app import create_app
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,8 @@ class HackerTrap:
             cfg.honeypot.listen_host,
             cfg.honeypot.ports,
             self.events.handle_service_hit,
+            persona_id=cfg.honeypot.persona,
+            hostname=cfg.honeypot.hostname,
         )
         self.detector = LogDetector(
             self.events.handle_port_scan,
@@ -41,6 +44,10 @@ class HackerTrap:
 
     async def run(self) -> None:
         await init_db(self.cfg.db_path)
+
+        if self.cfg.setup_complete:
+            refresh_mdns(self.cfg)
+            await self.events.maybe_notify_reboot()
 
         if self.cfg.config_path is None:
             # First run — persist config so the setup token survives restarts.

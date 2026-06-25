@@ -37,7 +37,10 @@
 
 <section class="grid two-col">
   <div class="card">
-    <h2>Services listening</h2>
+    <h2>Trap persona</h2>
+    <p><strong>{{ persona_label }}</strong> · hostname <code>{{ hostname }}</code></p>
+    <p class="hint">Bait services and mDNS advertisement match this identity on the network.</p>
+    <h3>Services listening</h3>
     <ul class="service-list">
       {% for name, port in ports.items() %}
       <li><span class="badge">{{ name|upper }}</span> port {{ port }}</li>

@@ -1,20 +1,25 @@
 # Copy to config.local.yaml for local development.
-# Ports above 1024 avoid needing root on macOS/Linux dev machines.
+# High ports avoid needing root on macOS/Linux dev machines.
 
 device_id: dev-local
 setup_complete: false
 data_dir: ./data
 
 honeypot:
+  persona: accountserver
   hostname: dev-honeytrap
   listen_host: 127.0.0.1
   ports:
     ftp: 2121
     telnet: 2323
-    ssh: 2222
     vnc: 5901
+    http: 8081
+    smb: 9445
+    snmp: 9161
+    ssdp: 9190
 
 notifications:
+  notify_on_reboot: false
   ntfy:
     enabled: false
     server: https://ntfy.sh

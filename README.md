@@ -54,22 +54,39 @@ You don't need to be a tech person for this. Here's what actually matters:
 HackerTrap watches for the kind of snooping that happens *before* someone tries anything serious:
 
 1. **Port scanning** — something systematically checking what's on your network
-2. **FTP probes** (port 21) — something connecting to an old file-server port
-3. **Telnet probes** (port 23) — a sign of something automated and unfriendly
-4. **SSH probes** (port 22) — something looking for remote access *(logged via network monitoring; see below)*
-5. **VNC probes** (port 5900) — something hunting for open desktops
+2. **Fake service probes** — connections to bait ports that look like forgotten infrastructure
+3. **High-value target touches** — SSH, RDP, MySQL, Redis, SMB/NetBIOS, and similar (via network logging)
+4. **Device reboot** — optional notification when the Pi comes back after a power cycle *(not on routine software updates)*
 
 If you get an alert, something on your network is looking for a weak spot. It might be harmless — a misconfigured app, a curious teenager, a new smart device doing something dumb. Or it might not be. Either way, **now you know.**
 
-### How the trap works (ports open vs closed)
+### How the trap works
 
-HackerTrap runs **fake services** on FTP, Telnet, and VNC. Those ports show as **open** to a scanner — an attacker gets a plausible banner back, and you get an alert when they connect.
+HackerTrap pretends to be boring internal infrastructure — an accounting server, backup NAS, or print spooler. You pick a **persona** during setup. That choice sets the hostname, network advertisement, decoy web page, and bait ports.
 
-**Port 22 (SSH)** is different: your Pi needs SSH for you to manage it, so we can't run a fake SSH server on the same port. SSH probes are still detected via network logging when something touches port 22.
+**Fake services (open ports with plausible responses):**
 
-**Port scans** (many ports quickly) are detected separately — that's the classic "someone mapping your network" behaviour.
+| Port | Service | Why attackers care |
+|------|---------|-------------------|
+| 21 | FTP | Legacy file servers, anonymous login hunts |
+| 23 | Telnet | Unencrypted admin access |
+| 80 | HTTP decoy | Fake admin / NAS login page |
+| 445 | SMB | #1 Windows lateral-movement target |
+| 5900 | VNC | Open desktops |
+| 161 | SNMP (UDP) | Device fingerprinting |
+| 1900 | UPnP/SSDP (UDP) | IoT and smart-device discovery |
 
-False alarms are unlikely from normal home use. The bait ports (FTP, Telnet, VNC) are almost never touched legitimately. Port-scan alerts are the most likely source of noise if you run network audit tools yourself.
+**Logged probes (iptables — touch = alert, no fake daemon needed):**
+
+SSH (22), NetBIOS (139), MySQL (3306), PostgreSQL (5432), Redis (6379), RDP (3389), MongoDB (27017), and others.
+
+**Port 22 (SSH)** stays your real sshd for management. Probes to port 22 still trigger alerts.
+
+**Port scans** (many ports quickly) are detected separately — classic "someone mapping your network" behaviour.
+
+**Admin web UI** runs on **port 8080** — separate from the decoy page on port 80, so the trap looks like a normal server while you manage it safely.
+
+False alarms are unlikely from normal home use. The bait ports are almost never touched legitimately. Port-scan alerts are the most likely source of noise if you run network audit tools yourself — see [TESTING.md](TESTING.md).
 
 ---
 
@@ -126,7 +143,7 @@ Examples: `http://fileserver.local:8080`, `http://accountserver.local:8080`
 
 If `.local` doesn't work, use the Pi's IP address instead (find it in your router, or run `hostname -I` on the Pi).
 
-Follow the setup wizard: pick a bland device name, set an **admin password**, configure ntfy, and send a test alert.
+Follow the setup wizard: pick a **persona** (accounting server, backup NAS, or print server), set an **admin password**, configure ntfy, and send a test alert.
 
 ---
 
@@ -135,6 +152,7 @@ Follow the setup wizard: pick a bland device name, set an **admin password**, co
 After setup, open **Settings** from the dashboard to:
 
 - Change notification topics (no need to redo setup or edit YAML)
+- Toggle **reboot notifications**
 - Set or change the admin password
 - Change the device timezone
 - **Check for updates & install** (pulls from GitHub and restarts — config and alerts are kept)
@@ -184,6 +202,16 @@ HACKERTRAP_DATA_DIR=./data hackertrap
 Open http://127.0.0.1:8080/setup
 
 Production config: `/etc/hackertrap/config.yaml`
+
+**Testing bait services and alerts:** see [TESTING.md](TESTING.md) — works from Mac/Linux with `nmap`, `nc`, and `curl`; no Windows required.
+
+Quick smoke test on the Pi (auto-detects LAN IP):
+
+```bash
+sudo bash /opt/hackertrap/deploy/smoke-test.sh
+```
+
+From another machine: `TARGET=<device-ip> bash deploy/smoke-test.sh`
 
 ---
 

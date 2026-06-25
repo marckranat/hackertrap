@@ -6,11 +6,16 @@ import re
 import subprocess
 from functools import lru_cache
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from hackertrap.config import Config
 
 logger = logging.getLogger(__name__)
 
 UPDATE_LOG = Path("/var/lib/hackertrap/update.log")
 INSTALLED_COMMIT_FILE = Path("/var/lib/hackertrap/installed-commit")
+BOOT_ID_FILE = Path("/var/lib/hackertrap/last_boot_id")
 DEFAULT_REPO_URL = "https://github.com/marckranat/hackertrap"
 DEFAULT_REPO_PATH = Path("/var/lib/hackertrap/repo")
 TZ_PATTERN = re.compile(r"^[A-Za-z0-9_+-]+(?:/[A-Za-z0-9_+-]+)+$")
@@ -175,3 +180,78 @@ async def trigger_update(repo_path: Path, repo_url: str = DEFAULT_REPO_URL) -> t
     log_handle.close()
     logger.info("Update triggered (pid %s) repo=%s url=%s", proc.pid, repo_path, repo_url)
     return True, repo_url
+
+
+def read_kernel_boot_id() -> str:
+    path = Path("/proc/sys/kernel/random/boot_id")
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def _read_stored_boot_id() -> str | None:
+    try:
+        text = BOOT_ID_FILE.read_text(encoding="utf-8").strip()
+        return text or None
+    except OSError:
+        return None
+
+
+def _write_stored_boot_id(boot_id: str) -> None:
+    BOOT_ID_FILE.parent.mkdir(parents=True, exist_ok=True)
+    BOOT_ID_FILE.write_text(boot_id, encoding="utf-8")
+
+
+def consume_reboot_notification() -> str | None:
+    """Return reboot detail if this is a new kernel boot; always records boot_id."""
+    current = read_kernel_boot_id()
+    if not current:
+        return None
+
+    stored = _read_stored_boot_id()
+    _write_stored_boot_id(current)
+
+    if stored is None:
+        return None  # first run — establish baseline without alerting
+    if stored == current:
+        return None  # service restart within same boot
+
+    uptime = _uptime_seconds()
+    uptime_text = f"{int(uptime)}s" if uptime >= 0 else "unknown"
+    return f"Cold boot detected (uptime {uptime_text})"
+
+
+def _uptime_seconds() -> float:
+    try:
+        content = Path("/proc/uptime").read_text(encoding="utf-8").split()
+        return float(content[0]) if content else -1.0
+    except (OSError, ValueError, IndexError):
+        return -1.0
+
+
+def refresh_mdns(cfg: Config) -> bool:
+    """Update Avahi service advertisement from config. Returns True if changed."""
+    from hackertrap.personas import write_avahi_service
+
+    try:
+        changed = write_avahi_service(cfg)
+    except OSError as exc:
+        logger.warning("Could not write Avahi service: %s", exc)
+        return False
+
+    if not changed:
+        return False
+
+    try:
+        subprocess.run(
+            ["systemctl", "restart", "avahi-daemon"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=15,
+        )
+        logger.info("Updated mDNS advertisement for persona %s", cfg.honeypot.persona)
+    except (subprocess.SubprocessError, FileNotFoundError) as exc:
+        logger.warning("Avahi restart failed: %s", exc)
+    return True

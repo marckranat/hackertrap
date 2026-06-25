@@ -33,7 +33,7 @@
 
 <section class="card hero">
   <h1>Settings</h1>
-  <p>Device <code>{{ device_id }}</code> · v{{ version }} ·
+  <p>Device <code>{{ device_id }}</code> · v{{ version }} · persona <strong>{{ persona_label }}</strong> ·
      web UI at <code>http://{{ system_hostname }}.local:8080</code></p>
 </section>
 
@@ -73,6 +73,12 @@
       <input type="text" name="webhook_name" value="{{ webhook_name }}">
     </label>
   </fieldset>
+
+  <label class="checkbox-label">
+    <input type="checkbox" name="notify_on_reboot" value="on" {% if notify_on_reboot %}checked{% endif %}>
+    Notify when the device reboots (power cycle or <code>sudo reboot</code>)
+  </label>
+  <p class="hint">Service restarts from software updates do not trigger this — only a full reboot.</p>
 
   <button type="submit" class="btn primary">Save notifications</button>
 </form>

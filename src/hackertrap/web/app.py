@@ -12,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 from hackertrap import __version__
 from hackertrap.alerts import build_channels
 from hackertrap.config import DEFAULT_HOSTNAME, Config, normalize_ntfy_topic, repo_url_for, save_config
+from hackertrap.personas import PERSONAS, apply_persona
 from hackertrap.db import alert_count, list_alerts
 from hackertrap.detector import check_iptables_logging, ensure_iptables_logging
 from hackertrap.events import EventHandler
@@ -20,6 +21,7 @@ from hackertrap.system_ops import (
     get_installed_commit,
     get_last_update_log,
     get_timezone,
+    refresh_mdns,
     repo_dir,
     set_timezone,
     trigger_update,
@@ -144,6 +146,9 @@ def create_app(cfg: Config, events: EventHandler, started_at: datetime) -> FastA
                 channels=channels,
                 iptables_ok=check_iptables_logging(),
                 ports=cfg.honeypot.ports,
+                persona_label=PERSONAS.get(cfg.honeypot.persona, PERSONAS["accountserver"]).display_name
+                if cfg.honeypot.persona in PERSONAS
+                else cfg.honeypot.hostname,
             ),
         )
 
@@ -196,13 +201,14 @@ def create_app(cfg: Config, events: EventHandler, started_at: datetime) -> FastA
         return templates.TemplateResponse(
             request,
             "setup.html",
-            ctx(request, setup_token=cfg.web.setup_token),
+            ctx(request, setup_token=cfg.web.setup_token, personas=PERSONAS),
         )
 
     @app.post("/setup")
     async def setup_submit(
         token: str = Form(...),
-        hostname: str = Form(...),
+        persona: str = Form(default="accountserver"),
+        hostname: str = Form(default=""),
         admin_password: str = Form(...),
         ntfy_enabled: str = Form(default=""),
         ntfy_server: str = Form(default="https://ntfy.sh"),
@@ -219,7 +225,12 @@ def create_app(cfg: Config, events: EventHandler, started_at: datetime) -> FastA
         if len(admin_password.strip()) < 8:
             raise HTTPException(status_code=400, detail="Admin password must be at least 8 characters")
 
-        cfg.honeypot.hostname = hostname.strip()[:64] or DEFAULT_HOSTNAME
+        if persona != "custom" and persona in PERSONAS:
+            apply_persona(cfg, persona)
+        else:
+            cfg.honeypot.persona = "custom"
+            cfg.honeypot.hostname = hostname.strip()[:64] or DEFAULT_HOSTNAME
+
         set_password(cfg, admin_password.strip())
         apply_notifications(
             ntfy_topic,
@@ -232,6 +243,7 @@ def create_app(cfg: Config, events: EventHandler, started_at: datetime) -> FastA
         )
         cfg.setup_complete = True
         save_config(cfg)
+        refresh_mdns(cfg)
 
         response = RedirectResponse("/", status_code=303)
         response.set_cookie(SESSION_COOKIE, make_session_token(cfg), httponly=True, samesite="lax")
@@ -261,6 +273,10 @@ def create_app(cfg: Config, events: EventHandler, started_at: datetime) -> FastA
                 repo_url=repo_url_for(cfg),
                 installed_commit=get_installed_commit(repo_dir(cfg.system.repo_path)),
                 last_update_log=get_last_update_log(),
+                notify_on_reboot=cfg.notifications.notify_on_reboot,
+                persona_label=PERSONAS.get(cfg.honeypot.persona, PERSONAS["accountserver"]).display_name
+                if cfg.honeypot.persona in PERSONAS
+                else cfg.honeypot.hostname,
             ),
         )
 
@@ -272,12 +288,14 @@ def create_app(cfg: Config, events: EventHandler, started_at: datetime) -> FastA
         ntfy_token: str = Form(default=""),
         webhook_url: str = Form(default=""),
         webhook_name: str = Form(default="discord"),
+        notify_on_reboot: str = Form(default=""),
     ):
         if not cfg.setup_complete:
             raise HTTPException(status_code=400, detail="Complete setup first")
         if redirect := require_login(request):
             return redirect
 
+        cfg.notifications.notify_on_reboot = notify_on_reboot == "on"
         apply_notifications(
             ntfy_topic,
             ntfy_server,

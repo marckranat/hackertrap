@@ -13,11 +13,20 @@
 
   <h2>1. Device identity</h2>
   <label>
-    Hostname (what this Pi looks like on the network)
-    <input type="text" name="hostname" value="{{ hostname }}" maxlength="64" required
+    Persona (what this device pretends to be)
+    <select name="persona" id="persona-select">
+      {% for pid, p in personas.items() %}
+      <option value="{{ pid }}" data-hostname="{{ p.hostname }}">{{ p.display_name }} ({{ p.hostname }})</option>
+      {% endfor %}
+      <option value="custom">Custom hostname</option>
+    </select>
+  </label>
+  <label id="custom-hostname-wrap" style="display:none">
+    Custom hostname
+    <input type="text" name="hostname" id="hostname-input" maxlength="64"
            placeholder="accountserver">
   </label>
-  <p class="hint">Pick a boring name that fits your network — e.g. <code>accountserver</code>, <code>filemanager</code>, <code>dc02</code>, <code>NAS01</code>. Avoid anything with "honeypot" or "trap" in it.</p>
+  <p class="hint">Pick a boring identity that fits your network. The persona sets the fake login page, network name, and bait ports attackers expect to find.</p>
 
   <h2>2. Notifications</h2>
   <p class="hint">
@@ -63,4 +72,22 @@
 
   <button type="submit" class="btn primary">Save &amp; start monitoring</button>
 </form>
+
+<script>
+(function () {
+  var sel = document.getElementById('persona-select');
+  var wrap = document.getElementById('custom-hostname-wrap');
+  var input = document.getElementById('hostname-input');
+  function sync() {
+    var custom = sel.value === 'custom';
+    wrap.style.display = custom ? '' : 'none';
+    if (!custom) {
+      var opt = sel.options[sel.selectedIndex];
+      input.value = opt.getAttribute('data-hostname') || '';
+    }
+  }
+  sel.addEventListener('change', sync);
+  sync();
+})();
+</script>
 {% endblock %}

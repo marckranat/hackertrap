@@ -23,8 +23,20 @@ IPTABLES_RE = re.compile(
 ScanCallback = Callable[[str, str], Awaitable[None]]
 ProbeCallback = Callable[[str, str, str], Awaitable[None]]
 
-# Ports watched via iptables logs (can't bind fake services — e.g. SSH uses port 22).
-IPTABLES_PROBE_PORTS: dict[int, str] = {22: "ssh"}
+# High-value ports logged via iptables (not bound as fake services).
+# Ports handled by the honeypot itself (21, 23, 80, 445, 161, 1900, 5900) are omitted.
+IPTABLES_PROBE_PORTS: dict[int, str] = {
+    22: "ssh",
+    139: "netbios",
+    3306: "mysql",
+    5432: "postgresql",
+    6379: "redis",
+    3389: "rdp",
+    27017: "mongodb",
+    8443: "https-admin",
+    2375: "docker-api",
+    5985: "winrm",
+}
 
 
 class ProbeTracker:

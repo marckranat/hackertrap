@@ -44,14 +44,20 @@ setup_complete: false
 data_dir: $DATA_DIR
 
 honeypot:
+  persona: accountserver
   hostname: accountserver
   listen_host: 0.0.0.0
   ports:
     ftp: 21
     telnet: 23
     vnc: 5900
+    http: 80
+    smb: 445
+    snmp: 161
+    ssdp: 1900
 
 notifications:
+  notify_on_reboot: true
   ntfy:
     enabled: false
     server: https://ntfy.sh

@@ -2,7 +2,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from hackertrap.config import DEFAULT_REPO_PATH, DEFAULT_REPO_URL
-from hackertrap.system_ops import get_installed_commit, repo_dir
+from hackertrap.system_ops import (
+    consume_reboot_notification,
+    get_installed_commit,
+    repo_dir,
+)
 
 
 def test_repo_dir_defaults():
@@ -43,3 +47,37 @@ def test_get_last_update_log_shows_latest_session(tmp_path: Path):
         text = get_last_update_log()
         assert "new time" in text
         assert "old failure" not in text
+
+
+def test_consume_reboot_notification_first_boot(tmp_path):
+    boot_file = tmp_path / "last_boot_id"
+    with (
+        patch("hackertrap.system_ops.read_kernel_boot_id", return_value="boot-abc"),
+        patch("hackertrap.system_ops.BOOT_ID_FILE", boot_file),
+    ):
+        assert consume_reboot_notification() is None
+        assert boot_file.read_text() == "boot-abc"
+
+
+def test_consume_reboot_notification_after_reboot(tmp_path):
+    boot_file = tmp_path / "last_boot_id"
+    boot_file.write_text("boot-old", encoding="utf-8")
+    with (
+        patch("hackertrap.system_ops.read_kernel_boot_id", return_value="boot-new"),
+        patch("hackertrap.system_ops._uptime_seconds", return_value=42.0),
+        patch("hackertrap.system_ops.BOOT_ID_FILE", boot_file),
+    ):
+        detail = consume_reboot_notification()
+        assert detail is not None
+        assert "Cold boot" in detail
+        assert boot_file.read_text() == "boot-new"
+
+
+def test_consume_reboot_notification_service_restart(tmp_path):
+    boot_file = tmp_path / "last_boot_id"
+    boot_file.write_text("boot-same", encoding="utf-8")
+    with (
+        patch("hackertrap.system_ops.read_kernel_boot_id", return_value="boot-same"),
+        patch("hackertrap.system_ops.BOOT_ID_FILE", boot_file),
+    ):
+        assert consume_reboot_notification() is None

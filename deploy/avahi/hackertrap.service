@@ -1,11 +1,16 @@
 <?xml version="1.0" standalone='no'?>
 <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<!-- Overwritten on startup from config persona — see hackertrap.personas.write_avahi_service -->
 <service-group>
-  <name replace-wildcards="yes">HackerTrap on %h</name>
+  <name replace-wildcards="yes">Accounting Server on %h</name>
   <service>
     <type>_http._tcp</type>
-    <port>8080</port>
-    <txt-record>product=HackerTrap</txt-record>
-    <txt-record>url=https://hackertraps.com</txt-record>
+    <port>80</port>
+    <txt-record>path=/</txt-record>
+  </service>
+  <service>
+    <type>_smb._tcp</type>
+    <port>445</port>
+    <txt-record>workgroup=WORKGROUP</txt-record>
   </service>
 </service-group>
