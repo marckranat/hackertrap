@@ -30,7 +30,15 @@ if [[ "$REPO_DIR" != "$STANDARD_REPO" ]]; then
 fi
 
 echo "==> Syncing to $INSTALL_DIR"
-rsync -a --exclude '.venv' --exclude '__pycache__' --exclude 'data' --exclude '.git' \
+rsync -a \
+  --exclude '.venv' \
+  --exclude '__pycache__' \
+  --exclude '*.egg-info' \
+  --exclude 'build' \
+  --exclude 'dist' \
+  --exclude '.pytest_cache' \
+  --exclude 'data' \
+  --exclude '.git' \
   "$REPO_DIR/" "$INSTALL_DIR/"
 
 if COMMIT=$(git -C "$REPO_DIR" log -1 --format="%h %s" 2>/dev/null); then
@@ -38,7 +46,10 @@ if COMMIT=$(git -C "$REPO_DIR" log -1 --format="%h %s" 2>/dev/null); then
 fi
 
 echo "==> Reinstalling Python package (includes web templates)"
-"$VENV/bin/pip" install -e "$INSTALL_DIR"
+# Stale egg-info from older installs can block editable rebuilds (timestamp/permission errors).
+find "$INSTALL_DIR" -type d -name '*.egg-info' -prune -exec rm -rf {} + 2>/dev/null || true
+rm -rf "$INSTALL_DIR/build" "$INSTALL_DIR/dist" 2>/dev/null || true
+"$VENV/bin/pip" install --no-cache-dir -e "$INSTALL_DIR"
 
 if ! command -v curl >/dev/null 2>&1; then
   echo "==> Installing curl (used for health checks)"

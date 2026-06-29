@@ -28,13 +28,22 @@ echo "==> Creating directories"
 mkdir -p "$INSTALL_DIR" "$DATA_DIR" "$CONFIG_DIR"
 
 echo "==> Copying application"
-rsync -a --exclude '.venv' --exclude '__pycache__' --exclude 'data' --exclude '.git' \
+rsync -a \
+  --exclude '.venv' \
+  --exclude '__pycache__' \
+  --exclude '*.egg-info' \
+  --exclude 'build' \
+  --exclude 'dist' \
+  --exclude '.pytest_cache' \
+  --exclude 'data' \
+  --exclude '.git' \
   "$REPO_DIR/" "$INSTALL_DIR/"
 
 echo "==> Creating virtualenv"
 python3 -m venv "$VENV"
 "$VENV/bin/pip" install --upgrade pip
-"$VENV/bin/pip" install -e "$INSTALL_DIR"
+find "$INSTALL_DIR" -type d -name '*.egg-info' -prune -exec rm -rf {} + 2>/dev/null || true
+"$VENV/bin/pip" install --no-cache-dir -e "$INSTALL_DIR"
 
 if [[ ! -f "$CONFIG_DIR/config.yaml" ]]; then
   echo "==> Creating default config"
